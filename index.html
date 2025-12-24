@@ -255,8 +255,8 @@
         </div>
         
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
-            <button class="tab" onclick="switchTab('tables')">Detailed Tables</button>
+            <button class="tab active" onclick="switchTab('dashboard', event)">Dashboard</button>
+            <button class="tab" onclick="switchTab('tables', event)">Detailed Tables</button>
         </div>
         
         <div id="dashboard" class="tab-content active">
@@ -388,7 +388,7 @@
         <div id="tables" class="tab-content">
             <div class="input-section">
                 <h3>📋 Yearly Amortization Schedule</h3>
-                <p class="info-text">Detailed breakdown of your mortgage payments over time, including Box 1 tax deduction benefits.</p>
+                <p class="info-text">Detailed breakdown of your mortgage payments over time, including Box 1 tax deduction benefits. Note: Box 1 deduction is calculated at 36% rate for typical income brackets.</p>
                 <div class="table-wrapper">
                     <table id="amortizationTable">
                         <thead>
@@ -428,7 +428,7 @@
     </div>
     
     <script>
-        function switchTab(tabName) {
+        function switchTab(tabName, event) {
             // Hide all tab contents
             const contents = document.querySelectorAll('.tab-content');
             contents.forEach(content => content.classList.remove('active'));
@@ -482,13 +482,20 @@
             
             // Calculate loan to value: principal / max(taxation, buying value)
             const maxValue = Math.max(taxationValue, buyingValue);
-            const loanToValue = principal / maxValue;
+            const loanToValue = maxValue > 0 ? principal / maxValue : 0;
             
             // Calculate monthly payment using mortgage formula
             const monthlyRate = interestRate / 12;
             const numPayments = loanTerm * 12;
-            const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / 
+            let monthlyPayment;
+            
+            if (interestRate === 0) {
+                // Handle zero interest rate case
+                monthlyPayment = principal / numPayments;
+            } else {
+                monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / 
                                   (Math.pow(1 + monthlyRate, numPayments) - 1);
+            }
             
             // Calculate total monthly expenses
             const monthlyRecurring = homeInsurance + internet + (waterGarbageTax / 12) + (propertyTax / 12);
@@ -561,15 +568,16 @@
             let balance = principal;
             const monthlyRate = rate / 12;
             
-            for (let year = 1; year <= Math.min(term, 30); year++) {
+            // Show all years up to the loan term
+            for (let year = 1; year <= term; year++) {
                 years.push(year);
                 let yearlyPrincipal = 0;
                 let yearlyInterest = 0;
                 
                 for (let month = 1; month <= 12; month++) {
                     const interestPayment = balance * monthlyRate;
-                    const principalPayment = monthlyPayment - interestPayment;
-                    balance -= principalPayment;
+                    const principalPayment = Math.min(monthlyPayment - interestPayment, balance);
+                    balance = Math.max(0, balance - principalPayment);
                     
                     yearlyPrincipal += principalPayment;
                     yearlyInterest += interestPayment;
@@ -633,7 +641,7 @@
             
             let balance = principal;
             const monthlyRate = rate / 12;
-            const box1Rate = 0.36; // Dutch Box 1 tax rate (approximate, can be adjusted)
+            const box1Rate = 0.36; // Dutch Box 1 tax rate (36% for typical income brackets)
             
             for (let year = 1; year <= term; year++) {
                 let yearlyPrincipal = 0;
@@ -641,7 +649,7 @@
                 
                 for (let month = 1; month <= 12; month++) {
                     const interestPayment = balance * monthlyRate;
-                    const principalPayment = monthlyPayment - interestPayment;
+                    const principalPayment = Math.min(monthlyPayment - interestPayment, balance);
                     balance = Math.max(0, balance - principalPayment);
                     
                     yearlyPrincipal += principalPayment;
